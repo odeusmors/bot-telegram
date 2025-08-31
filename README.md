@@ -27,6 +27,25 @@ bot-telegram/
 
 ---
 
+🤖 Bot de Moderação para Telegram
+Este é um bot de moderação para grupos do Telegram, projetado para manter o grupo seguro e organizado automaticamente.
+
+🔹 Funcionalidades
+Moderação Automática
+🔗 Bloqueia links suspeitos
+🆙 Bloqueia mensagens apenas em CAPS
+❌ Bloqueia palavras proibidas
+⚡ Proteção contra flood (muitas mensagens em sequência)
+Comandos de Admin
+⚠️ /warn → Dá um aviso ao usuário (3 avisos = ban automático)
+🔇 /mute → Silencia o usuário
+🔊 /unmute → Remove silêncio do usuário
+⛔ /ban → Bane o usuário
+Informações do Grupo
+📖 /regras → Mostra as regras do grupo
+🤖 /ajuda → Exibe todos os comandos do bot
+
+
 ## ⚙️ Funcionalidades
 
 ### Moderação Automática
