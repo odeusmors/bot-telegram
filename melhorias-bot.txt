@@ -1,0 +1,72 @@
+Roadmap de Evolução do Bot
+Etapa 1 – Estabilidade e Core
+
+Objetivo: Garantir que o bot esteja estável, confiável e que cumpra funções básicas de moderação.
+Tarefas:
+
+✅ Revisar comandos existentes: /start, /ajuda, /regras, /warn, /mute, /unmute, /ban.
+
+✅ Garantir logs corretos de eventos (mensagens deletadas, avisos, bans).
+
+✅ Ajustar flood, capslock e bloqueio de palavras proibidas.
+
+✅ Garantir compatibilidade com grupos grandes.
+
+Etapa 2 – Interatividade
+
+Objetivo: Tornar o bot mais amigável e interativo com os usuários.
+Tarefas:
+
+✨ Melhorar /ajuda com emojis e formatação (já feito).
+
+✨ Implementar mensagens de boas-vindas com emojis, gifs ou imagens.
+
+✨ Criar mensagens de despedida quando alguém sair do grupo.
+
+✨ Respostas automáticas a cumprimentos e palavras-chave (já parcialmente feito).
+
+Etapa 3 – Segurança Avançada
+
+Objetivo: Prevenir abusos e manter o grupo seguro.
+Tarefas:
+
+🔒 Anti-bot: detectar bots que entram e remover automaticamente.
+
+🔒 Anti-mention/mass tagging: impedir @everyone ou menções excessivas.
+
+🔒 Sistema de avisos escalonado: 1º/2º aviso = alerta, 3º = kick/ban automático.
+
+Etapa 4 – Comandos Extras
+
+Objetivo: Adicionar funcionalidades úteis para admins e membros.
+Tarefas:
+
+🛠️ /perfil → mostrar estatísticas do usuário (mensagens enviadas, avisos, tempo no grupo).
+
+🛠️ /enquete → criar enquetes rápidas com botões.
+
+🛠️ /regras interativo → paginar regras ou mostrar via botões.
+
+🛠️ /lembrete → enviar mensagem programada para o usuário ou grupo.
+
+Etapa 5 – Engajamento e Diversão
+
+Objetivo: Tornar o grupo mais ativo e divertido, mantendo a moderação.
+Tarefas:
+
+🎮 Mini-jogos ou quizzes interativos via bot.
+
+📊 Pesquisa de sentimento: analisar mensagens e indicar se há conflito ou discussões.
+
+🎉 Reações automáticas a certas palavras-chave com gifs, stickers ou emojis.
+
+Etapa 6 – Relatórios e Analytics
+
+Objetivo: Dar aos admins informações úteis sobre a dinâmica do grupo.
+Tarefas:
+
+📄 Logs detalhados separados: mensagens deletadas, avisos, bans.
+
+📈 Relatórios semanais/mensais via chat ou arquivo.
+
+📊 Estatísticas sobre usuários ativos, flood e mensagens suspeitas.

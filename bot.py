@@ -27,32 +27,25 @@ rules_text = """
 warnings = defaultdict(int)
 LOG_FILE = "logs.txt"
 
-
 # =============== FUNÇÃO DE LOG (BRT) ===============
 def log_event(event):
-    timestamp = datetime.datetime.utcnow() + datetime.timedelta(
-        hours=-3)  # UTC-3
+    timestamp = datetime.datetime.utcnow() + datetime.timedelta(hours=-3)  # UTC-3
     timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a") as f:
         f.write(f"[{timestamp_str}] {event}\n")
     print(f"[{timestamp_str}] {event}")
 
-
 # =============== FLASK PARA MANTER ONLINE ===============
 app = Flask('')
-
 
 @app.route('/')
 def home():
     return "Bot online!"
 
-
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
-
 Thread(target=run_flask).start()
-
 
 # =============== COMANDOS BÁSICOS ===============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,43 +55,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Comando /start usado por {update.message.from_user.username or update.message.from_user.first_name}"
     )
 
-
 async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(rules_text)
     log_event(
         f"Comando /regras usado por {update.message.from_user.username or update.message.from_user.first_name}"
     )
 
-    async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        help_text = """
-    🤖 *Comandos e funcionalidades do Bot:*
+# =============== AJUDA INTERATIVA ===============
+async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = """
+🤖 *Central de Comandos do Bot*
 
-    📌 *Moderação automática* (sempre ativa):
-    - Bloqueia links suspeitos (http://, https://, t.me/)
-    - Bloqueia CAPSLOCK excessivo
-    - Bloqueia palavras proibidas: hack gratuito, senha123, porn, crack, spam
-    - Detecta e previne flood de mensagens
+✨ *Moderação automática:*
+🔗 Bloqueia links suspeitos  
+🆙 Bloqueia mensagens só em CAPS  
+❌ Bloqueia palavras proibidas  
+⚡ Protege contra flood (muitas mensagens em sequência)  
 
-    📌 *Comandos de admin* (responda à mensagem do usuário):
-    - /warn → Dá um aviso (3 avisos = ban automático)
-    - /mute → Silencia o usuário
-    - /unmute → Remove o silêncio do usuário
-    - /ban → Bane o usuário
+🛡️ *Comandos de admin* (responda à mensagem do usuário):
+⚠️ /warn → Dá um aviso ao usuário (3 avisos = ban automático)  
+🔇 /mute → Silencia o usuário  
+🔊 /unmute → Remove silêncio do usuário  
+⛔ /ban → Bane o usuário  
 
-    📌 *Informações do grupo:*
-    - /regras → Mostra as regras do grupo
-    - /ajuda → Mostra esta mensagem
+📌 *Informações do grupo:*
+📖 /regras → Mostra as regras do grupo  
+💡 *Dica:* Respeite sempre as regras e colabore com conteúdo relevante!  
 
-    💡 *Dicas de uso:*
-    - Sempre responda a mensagem do usuário ao usar comandos de moderação.
-    - Mensagens deletadas ou ações de moderação são registradas no log.
-    - O bot funciona mesmo sem comandos, monitorando automaticamente o grupo.
-    """
-        await update.message.reply_text(help_text, parse_mode="Markdown")
-        log_event(
-            f"Comando /ajuda usado por {update.message.from_user.username or update.message.from_user.first_name}"
-        )
-
+📬 *Observação:* Este bot mantém o grupo organizado e seguro automaticamente.
+"""
+    await update.message.reply_text(help_text, parse_mode="Markdown")
+    log_event(
+        f"Comando /ajuda usado por {update.message.from_user.username or update.message.from_user.first_name}"
+    )
 
 # =============== BOAS-VINDAS ===============
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -108,7 +97,6 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_event(
             f"Novo membro {member.username or member.first_name} entrou no grupo"
         )
-
 
 # =============== MODERAÇÃO AUTOMÁTICA ===============
 async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -146,9 +134,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Anti-flood
     now = time.time()
-    user_messages[user_id] = [
-        t for t in user_messages[user_id] if now - t < flood_interval
-    ]
+    user_messages[user_id] = [t for t in user_messages[user_id] if now - t < flood_interval]
     user_messages[user_id].append(now)
 
     if len(user_messages[user_id]) > flood_limit:
@@ -158,10 +144,8 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_event(f"Flood detectado de {username}")
         return
 
-
 # =============== RESPOSTAS AUTOMÁTICAS ===============
-async def respostas_automaticas(update: Update,
-                                context: ContextTypes.DEFAULT_TYPE):
+async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     username = update.message.from_user.username or update.message.from_user.first_name
     if "oi" in text or "olá" in text:
@@ -171,7 +155,6 @@ async def respostas_automaticas(update: Update,
         await update.message.reply_text(
             "Use o comando /ajuda para ver todos os comandos do bot.")
         log_event(f"Resposta automática 'ajuda' enviada para {username}")
-
 
 # =============== COMANDOS DE ADMIN ===============
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -192,7 +175,6 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_event(
             f"{user.username or user.first_name} foi banido após 3 avisos")
 
-
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text(
@@ -206,7 +188,6 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log_event(
         f"{user.username or user.first_name} foi silenciado por {update.message.from_user.username}"
     )
-
 
 async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
@@ -223,7 +204,6 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{user.username or user.first_name} teve o silêncio removido por {update.message.from_user.username}"
     )
 
-
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text(
@@ -234,7 +214,6 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log_event(
         f"{user.username or user.first_name} foi banido por {update.message.from_user.username}"
     )
-
 
 # =============== MAIN ===============
 def main():
@@ -250,24 +229,20 @@ def main():
     app_bot.add_handler(CommandHandler("ban", ban))
 
     # Eventos
-    app_bot.add_handler(
-        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-    app_bot.add_handler(
-        MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
-    app_bot.add_handler(
-        MessageHandler(filters.TEXT & (~filters.COMMAND),
-                       respostas_automaticas))
+    app_bot.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
+    app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respostas_automaticas))
 
     print("✅ Bot rodando...")
     log_event("Bot iniciado e pronto para operação")
 
+    # Loop seguro para reinício automático
     try:
         app_bot.run_polling()
     except Exception as e:
         log_event(f"⚠️ Bot caiu com erro: {e}. Reiniciando em 5 segundos...")
         time.sleep(5)
         main()
-
 
 if __name__ == "__main__":
     main()
