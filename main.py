@@ -7,23 +7,42 @@ from threading import Thread
 import re
 import time
 import datetime
+import sqlite3
 
 # ================= CONFIGURAÇÕES =================
-TOKEN = "7607196071:AAG8r_6qfR_fOv-htcEVnNHoMcy1tnmHeZ4"
+TOKEN = "SEU_TOKEN_AQUI"
 
 flood_limit = 5
 flood_interval = 10
 user_messages = defaultdict(list)
 blocked_words = ["hack gratuito", "senha123", "porn", "crack", "spam"]
 welcome_message = "👋 Bem-vindo(a), {user}! Respeite as regras e aproveite o grupo 🚀"
-LOG_FILE = "logs.txt"
+
+# ================= BANCO DE DADOS =================
+conn = sqlite3.connect('logs.db', check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    user TEXT,
+    action TEXT
+)
+""")
+conn.commit()
 
 # ================= FUNÇÃO DE LOG =================
-def log_event(event):
-    timestamp = datetime.datetime.utcnow() + datetime.timedelta(hours=-3)  # UTC-3
+def log_event(event, user=None):
+    timestamp = datetime.datetime.utcnow() + datetime.timedelta(hours=-3)
     timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a") as f:
-        f.write(f"[{timestamp_str}] {event}\n")
+    
+    # Grava no banco
+    cursor.execute("INSERT INTO logs (timestamp, user, action) VALUES (?, ?, ?)",
+                   (timestamp_str, user, event))
+    conn.commit()
+    
+    # Print no console
     print(f"[{timestamp_str}] {event}")
 
 # ================= FLASK PARA MANTER ONLINE =================
@@ -43,7 +62,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 Bot de moderação ativo! Use /regras para ver as regras."
     )
-    log_event(f"Comando /start usado por {update.message.from_user.username or update.message.from_user.first_name}")
+    log_event("Comando /start usado", user=update.message.from_user.username)
 
 # ================= AJUDA INTERATIVA =================
 async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,7 +88,7 @@ async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📬 *Observação:* Este bot mantém o grupo organizado e seguro automaticamente.
 """
     await update.message.reply_text(help_text, parse_mode="Markdown")
-    log_event(f"Comando /ajuda usado por {update.message.from_user.username or update.message.from_user.first_name}")
+    log_event("Comando /ajuda usado", user=update.message.from_user.username)
 
 # ================= REGRAS FORMATADAS =================
 async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,13 +104,13 @@ async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ⚡ *O bot modera automaticamente para manter o grupo seguro.*
 """
     await update.message.reply_text(rules_text, parse_mode="Markdown")
-    log_event(f"Comando /regras usado por {update.message.from_user.username or update.message.from_user.first_name}")
+    log_event("Comando /regras usado", user=update.message.from_user.username)
 
 # ================= BOAS-VINDAS =================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         await update.message.reply_text(welcome_message.format(user=member.first_name))
-        log_event(f"Novo membro {member.username or member.first_name} entrou no grupo")
+        log_event(f"Novo membro entrou: {member.username or member.first_name}")
 
 # ================= MODERAÇÃO AUTOMÁTICA =================
 async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -103,14 +122,14 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "http://" in text or "https://" in text or "t.me/" in text:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id, f"⛔ @{username}, links não são permitidos.")
-        log_event(f"Link bloqueado de {username}: {text}")
+        log_event(f"Link bloqueado: {text}", user=username)
         return
 
     # Bloquear capslock
     if text.isupper() and len(text) > 5:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id, f"⚠️ @{username}, evite usar só MAIÚSCULAS.")
-        log_event(f"Mensagem em CAPS bloqueada de {username}: {text}")
+        log_event(f"Mensagem em CAPS bloqueada: {text}", user=username)
         return
 
     # Palavras proibidas
@@ -118,7 +137,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if re.search(rf"\b{word}\b", text, re.IGNORECASE):
             await update.message.delete()
             await context.bot.send_message(update.effective_chat.id, f"🚫 @{username}, essa palavra não é permitida.")
-            log_event(f"Palavra proibida bloqueada de {username}: {text}")
+            log_event(f"Palavra proibida: {text}", user=username)
             return
 
     # Anti-flood
@@ -129,7 +148,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(user_messages[user_id]) > flood_limit:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id, f"⚠️ @{username}, pare de floodar.")
-        log_event(f"Flood detectado de {username}")
+        log_event("Flood detectado", user=username)
         return
 
 # ================= RESPOSTAS AUTOMÁTICAS =================
@@ -138,10 +157,10 @@ async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TY
     username = update.message.from_user.username or update.message.from_user.first_name
     if "oi" in text or "olá" in text:
         await update.message.reply_text(f"Olá @{username}! 👋")
-        log_event(f"Resposta automática 'Olá' enviada para {username}")
+        log_event("Resposta automática 'Olá' enviada", user=username)
     elif "ajuda" in text:
         await update.message.reply_text("Use o comando /ajuda para ver todos os comandos do bot.")
-        log_event(f"Resposta automática 'ajuda' enviada para {username}")
+        log_event("Resposta automática 'ajuda' enviada", user=username)
 
 # ================= COMANDOS DE ADMIN =================
 warnings = defaultdict(int)
@@ -153,7 +172,7 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.reply_to_message.from_user
     warnings[user.id] += 1
     await update.message.reply_text(f"⚠️ @{user.username or user.first_name} recebeu um aviso ({warnings[user.id]}/3).")
-    log_event(f"{update.message.from_user.username} deu /warn em {user.username or user.first_name} ({warnings[user.id]}/3)")
+    log_event(f"Comando /warn usado em {user.username or user.first_name} ({warnings[user.id]}/3)", user=update.message.from_user.username)
     if warnings[user.id] >= 3:
         await update.message.chat.kick_member(user.id)
         log_event(f"{user.username or user.first_name} foi banido após 3 avisos")
@@ -165,7 +184,7 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.reply_to_message.from_user
     permissions = ChatPermissions(can_send_messages=False)
     await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
-    log_event(f"{user.username or user.first_name} foi silenciado por {update.message.from_user.username}")
+    log_event(f"Usuário silenciado: {user.username or user.first_name}", user=update.message.from_user.username)
 
 async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
@@ -174,7 +193,7 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.reply_to_message.from_user
     permissions = ChatPermissions(can_send_messages=True, can_send_media_messages=True)
     await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
-    log_event(f"{user.username or user.first_name} teve o silêncio removido por {update.message.from_user.username}")
+    log_event(f"Silêncio removido: {user.username or user.first_name}", user=update.message.from_user.username)
 
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
@@ -182,7 +201,7 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user = update.message.reply_to_message.from_user
     await update.message.chat.kick_member(user.id)
-    log_event(f"{user.username or user.first_name} foi banido por {update.message.from_user.username}")
+    log_event(f"Usuário banido: {user.username or user.first_name}", user=update.message.from_user.username)
 
 # ================= MAIN =================
 def main():
@@ -205,13 +224,8 @@ def main():
     print("✅ Bot rodando...")
     log_event("Bot iniciado e pronto para operação")
 
-    # Loop seguro para reinício automático
-    try:
-        app_bot.run_polling()
-    except Exception as e:
-        log_event(f"⚠️ Bot caiu com erro: {e}. Reiniciando em 5 segundos...")
-        time.sleep(5)
-        main()
+    # Rodar polling
+    app_bot.run_polling()
 
 if __name__ == "__main__":
     main()
