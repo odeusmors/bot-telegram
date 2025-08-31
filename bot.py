@@ -6,7 +6,7 @@ import re
 import time
 
 # =============== CONFIGURAÇÕES ===============
-TOKEN = "7607196071:AAG8r_6qfR_fOv-htcEVnNHoMcy1tnmHeZ4"   # coloque o token do BotFather
+TOKEN = "7607196071:AAG8r_6qfR_fOv-htcEVnNHoMcy1tnmHeZ4"  # coloque o token do BotFather
 
 flood_limit = 5
 flood_interval = 10
@@ -34,6 +34,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(rules_text)
 
+async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = """
+🤖 *Comandos do Bot:*
+
+📌 Moderação automática:
+- Bloqueia links suspeitos
+- Bloqueia CAPSLOCK
+- Bloqueia palavras proibidas
+- Bloqueia flood (muitas mensagens seguidas)
+
+📌 Comandos de admin (responda a mensagem do usuário):
+- /warn → Dá um aviso ao usuário (3 avisos = ban automático)
+- /mute → Silencia o usuário
+- /unmute → Remove silêncio do usuário
+- /ban → Bane o usuário
+
+📌 Informações do grupo:
+- /regras → Mostra as regras do grupo
+"""
+    await update.message.reply_text(help_text, parse_mode="Markdown")
+
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         await update.message.reply_text(welcome_message.format(user=member.first_name))
@@ -48,14 +69,14 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "http://" in text or "https://" in text or "t.me/" in text:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id,
-                                 f"⛔ @{username}, links não são permitidos.")
+                                       f"⛔ @{username}, links não são permitidos.")
         return
 
     # 2. Bloquear capslock
     if text.isupper() and len(text) > 5:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id,
-                                 f"⚠️ @{username}, evite usar só MAIÚSCULAS.")
+                                       f"⚠️ @{username}, evite usar só MAIÚSCULAS.")
         return
 
     # 3. Palavras proibidas
@@ -63,7 +84,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if re.search(rf"\b{word}\b", text, re.IGNORECASE):
             await update.message.delete()
             await context.bot.send_message(update.effective_chat.id,
-                                     f"🚫 @{username}, essa palavra não é permitida.")
+                                           f"🚫 @{username}, essa palavra não é permitida.")
             return
 
     # 4. Anti-flood
@@ -74,8 +95,17 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(user_messages[user_id]) > flood_limit:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id,
-                                 f"⚠️ @{username}, pare de floodar.")
+                                       f"⚠️ @{username}, pare de floodar.")
         return
+
+# =============== RESPOSTAS AUTOMÁTICAS SIMPLES ===============
+async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.lower()
+    
+    if "oi" in text or "olá" in text:
+        await update.message.reply_text(f"Olá @{update.message.from_user.first_name}! 👋")
+    elif "ajuda" in text:
+        await update.message.reply_text("Use o comando /ajuda para ver todos os comandos do bot.")
 
 # =============== COMANDOS DE ADMIN ===============
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -127,6 +157,7 @@ def main():
     # Comandos
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("regras", regras))
+    app.add_handler(CommandHandler("ajuda", ajuda))
     app.add_handler(CommandHandler("warn", warn))
     app.add_handler(CommandHandler("mute", mute))
     app.add_handler(CommandHandler("unmute", unmute))
@@ -135,6 +166,7 @@ def main():
     # Eventos
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respostas_automaticas))
 
     print("✅ Bot rodando...")
     app.run_polling()
