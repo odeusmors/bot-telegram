@@ -1,57 +1,117 @@
 # 🤖 Bot de Moderação para Telegram
 
-Este é um bot de moderação para grupos do Telegram, projetado para manter o grupo seguro e organizado automaticamente.
+Este projeto é um **bot de moderação** para grupos do Telegram, com funcionalidades automáticas e comandos de administração. Ele foi desenvolvido em **Python** e está hospedado no **Render.com** para funcionar 24/7, com **logs persistentes** em SQLite.
 
 ---
 
-## 🔹 Funcionalidades
+## 🛠 Tecnologias Utilizadas
+
+- **Python 3.11+**
+- **[python-telegram-bot](https://python-telegram-bot.org/)** >= 20.0
+- **Flask** – para manter o bot online com web server
+- **SQLite3** – banco de dados para logs persistentes
+- **Render.com** – hospedagem e deploy contínuo via GitHub
+
+---
+
+## 📁 Estrutura do Projeto
+
+bot-telegram/
+│
+├─ main.py # Código principal do bot
+├─ consultar_logs.py # Script para consultar logs no SQLite
+├─ requirements.txt # Dependências do projeto
+├─ logs.db # Banco de dados SQLite (criado automaticamente)
+└─ README.md # Documentação do projeto
+
+
+---
+
+## ⚙️ Funcionalidades
 
 ### Moderação Automática
-- 🔗 Bloqueia links suspeitos
-- 🆙 Bloqueia mensagens apenas em CAPS
-- ❌ Bloqueia palavras proibidas
-- ⚡ Proteção contra flood (muitas mensagens em sequência)
+- Bloqueio de links suspeitos (`http://`, `https://`, `t.me/`)  
+- Bloqueio de mensagens somente em CAPS  
+- Bloqueio de palavras proibidas (configuráveis em `blocked_words`)  
+- Proteção contra flood (limite de mensagens por usuário)
 
 ### Comandos de Admin
-- ⚠️ `/warn` → Dá um aviso ao usuário (3 avisos = ban automático)  
-- 🔇 `/mute` → Silencia o usuário  
-- 🔊 `/unmute` → Remove silêncio do usuário  
-- ⛔ `/ban` → Bane o usuário  
+- `/warn` → dá aviso ao usuário (3 avisos = ban automático)  
+- `/mute` → silencia o usuário  
+- `/unmute` → remove silêncio  
+- `/ban` → bane o usuário  
 
-### Informações do Grupo
-- 📖 `/regras` → Mostra as regras do grupo  
-- 🤖 `/ajuda` → Exibe todos os comandos do bot  
+### Boas-vindas Automáticas
+- Mensagem de boas-vindas personalizada para novos membros
+
+### Logs Persistentes
+- Todas as ações do bot e do admin são registradas no **SQLite** (`logs.db`)  
+- É possível consultar os logs com `consultar_logs.py`
 
 ---
 
-## ⚙️ Configuração
+## 🚀 Configuração e Execução
 
-1. Clone este repositório ou faça o download dos arquivos.
-2. Instale as dependências:
-   ```bash
-   pip install python-telegram-bot flask watchdog
+### 1. Configuração Local
+1. Clone o projeto:
+```bash
+git clone https://github.com/SEU_USUARIO/bot-telegram.git
+cd bot-telegram
 
-Adicione o TOKEN do bot fornecido pelo @BotFather
- no arquivo main.py.
 
-Execute o bot:
+Instale as dependências:
+
+pip install -r requirements.txt
+
+
+Substitua o token do bot no main.py:
+
+TOKEN = "SEU_TOKEN_AQUI"
+
+
+Execute o bot localmente:
 
 python main.py
 
-📝 Logs
+2. Deploy no Render
 
-O bot gera logs de todas as atividades e comandos em logs.txt com horário em BRT (UTC-3).
+Crie um Web Service no Render.
 
-💡 Dicas
+Conecte ao repositório GitHub.
 
-Sempre respeite os limites de mensagens do grupo para evitar acionamento da proteção contra flood.
+Configure:
 
-Atualize a lista de palavras proibidas em main.py conforme a necessidade do grupo.
+Environment: Python 3
 
-O bot funciona automaticamente ao iniciar, não sendo necessário reiniciar manualmente.
+Build Command: pip install -r requirements.txt
 
-📌 Observações
+Start Command: python main.py
 
-Desenvolvido para grupos privados e públicos.
+Render fará deploy automático a cada commit na branch configurada.
 
-Futuras atualizações podem incluir novos comandos e funcionalidades avançadas de moderação.
+⚡ O Render reinicia automaticamente o bot se houver quedas.
+
+3. Consultar Logs
+
+Use o script consultar_logs.py para visualizar histórico do bot:
+
+python consultar_logs.py
+
+
+Mostra todos os logs, ou filtre por usuário/ação alterando as linhas no final do script.
+
+📝 Observações
+
+O arquivo logs.db é criado automaticamente na primeira execução do bot.
+
+Não execute mais de uma instância do bot ao mesmo tempo (pode causar erro de conflito getUpdates).
+
+Para produção, recomenda-se usar webhook em vez de polling para evitar conflitos.
+
+🔧 Dicas
+
+Atualize o bot localmente → commit → push → Render faz deploy automático.
+
+Monitore logs em tempo real pelo painel do Render ou via consultar_logs.py.
+
+Configure blocked_words e mensagens personalizadas diretamente no main.py.
