@@ -5,6 +5,8 @@ from collections import defaultdict
 from flask import Flask
 from threading import Thread
 import re
+from datetime import datetime
+import pytz
 import time
 
 # =============== CONFIGURAÇÕES ===============
@@ -27,12 +29,15 @@ warnings = defaultdict(int)
 
 LOG_FILE = "logs.txt"
 
+# =============== FUSO HORÁRIO BRASIL ===============
+br_tz = pytz.timezone("America/Sao_Paulo")
+
 # =============== FUNÇÃO DE LOG ===============
 def log_event(event):
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    timestamp = datetime.now(br_tz).strftime("%Y-%m-%d %H:%M:%S")
     with open(LOG_FILE, "a") as f:
         f.write(f"[{timestamp}] {event}\n")
-    print(f"[{timestamp}] {event}")  # também exibe no console
+    print(f"[{timestamp}] {event}")
 
 # =============== FLASK PARA MANTER ONLINE ===============
 app = Flask('')
@@ -126,6 +131,43 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_event(f"Flood detectado de {username}")
         return
 
+# =============== COMANDO PARA APAGAR MENSAGENS (somente usuários) ===============
+async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    chat_member = await update.effective_chat.get_member(user.id)
+
+    # Apenas admins podem usar
+    if not chat_member.status in ["administrator", "creator"]:
+        await update.message.reply_text("❌ Você precisa ser administrador para usar este comando.")
+        return
+
+    # Quantas mensagens apagar
+    try:
+        count = int(context.args[0])
+        if count < 1 or count > 100:
+            await update.message.reply_text("Use um número entre 1 e 100.")
+            return
+    except (IndexError, ValueError):
+        await update.message.reply_text("Use /clear <número de mensagens>")
+        return
+
+    # Buscar mensagens recentes
+    messages = await context.bot.get_chat_history(update.effective_chat.id, limit=count + 10)
+    deleted = 0
+    for msg in messages:
+        if msg.from_user.is_bot:
+            continue  # pula mensagens do bot
+        if deleted >= count:
+            break
+        try:
+            await context.bot.delete_message(update.effective_chat.id, msg.message_id)
+            deleted += 1
+        except:
+            continue
+
+    await update.message.reply_text(f"✅ {deleted} mensagens de usuários apagadas.", quote=True)
+    log_event(f"{user.username or user.first_name} apagou {deleted} mensagens de usuários com /clear")
+
 # =============== RESPOSTAS AUTOMÁTICAS ===============
 async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
@@ -188,14 +230,14 @@ def main():
     app_bot.add_handler(CommandHandler("mute", mute))
     app_bot.add_handler(CommandHandler("unmute", unmute))
     app_bot.add_handler(CommandHandler("ban", ban))
-
+    app_bot.add_handler(CommandHandler("clear", clear))
+    
     # Eventos
     app_bot.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
     app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
     app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respostas_automaticas))
 
-    print("✅ Bot rodando...")
-    log_event("Bot iniciado e pronto para operação")
+    log_event("✅ Bot iniciado e pronto para operação")
     app_bot.run_polling()
 
 if __name__ == "__main__":
