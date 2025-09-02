@@ -74,7 +74,7 @@ Informações do Grupo
 ### 1. Configuração Local
 1. Clone o projeto:
 ```bash
-git clone https://github.com/SEU_USUARIO/bot-telegram.git
+git clone https://github.com/odeusmors/bot-telegram
 cd bot-telegram
 
 
