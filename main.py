@@ -216,29 +216,37 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= COMANDO CLEAR =================
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    now = time.time()
-    one_hour = 60 * 60
-    deleted = 0
-
-    try:
-        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=200):
-            msg_time = message.date.timestamp()
-
-            if now - msg_time <= one_hour:
-                try:
-                    await context.bot.delete_message(chat.id, message.message_id)
-                    deleted += 1
-                except:
-                    pass
-    except Exception as e:
-        await update.message.reply_text(f"Erro ao buscar mensagens: {e}")
+    # Verificar se usuário informou a quantidade
+    if len(context.args) == 0 or not context.args[0].isdigit():
+        await update.message.reply_text("Use: /clear <quantidade>\nEx: /clear 5")
         return
 
-    await update.message.reply_text(
-        f"🧹 Foram apagadas {deleted} mensagens das últimas 1h."
+    quantidade = int(context.args[0])
+    chat_id = update.effective_chat.id
+    msg_id = update.message.message_id
+    apagadas = 0
+
+    for i in range(quantidade + 1):  # +1 para apagar também o comando
+        try:
+            await context.bot.delete_message(chat_id, msg_id - i)
+            apagadas += 1
+        except:
+            pass  # Ignora erros (mensagens muito antigas, sem permissão, etc.)
+
+    # Confirmação visual
+    try:
+        confirm = await update.message.reply_text(
+            f"🧹 {apagadas} mensagens apagadas!"
+        )
+        await confirm.delete()
+    except:
+        pass
+
+    log_event(
+        f"{apagadas} mensagens apagadas pelo /clear",
+        user=update.message.from_user.username
     )
-    log_event(f"{deleted} mensagens apagadas pelo /clear", user=update.message.from_user.username)
+
 
 # ================= MAIN =================
 def main():
