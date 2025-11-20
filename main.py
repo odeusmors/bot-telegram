@@ -6,6 +6,7 @@ import re
 import time
 import datetime
 import sqlite3
+import asyncio
 
 # ================= CONFIGURAÇÕES =================
 TOKEN = "7607196071:AAGLTY4LdKS3IsAu97Ufy8thkX6Hm34c7fU"
@@ -161,7 +162,6 @@ async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TY
         log_event("Resposta automática 'ajuda' enviada", user=username)
 
 # ================= SISTEMA DE AVISOS =================
-from collections import defaultdict
 warnings = defaultdict(int)
 
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -250,8 +250,11 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ================= MAIN =================
-def main():
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
+
+    # Remove qualquer webhook registrado
+    await app.bot.delete_webhook(drop_pending_updates=True)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("regras", regras))
@@ -269,7 +272,7 @@ def main():
     print("Bot rodando...")
     log_event("Bot iniciado com sucesso")
 
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
