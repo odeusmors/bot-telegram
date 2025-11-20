@@ -8,7 +8,7 @@ import datetime
 import sqlite3
 
 # ================= CONFIGURAÇÕES =================
-TOKEN = "7607196071:AAG8r_6qfR_fOv-htcEVnNHoMcy1tnmHeZ4"
+TOKEN = "7607196071:AAGLTY4LdKS3IsAu97Ufy8thkX6Hm34c7fU"
 
 flood_limit = 5
 flood_interval = 10
