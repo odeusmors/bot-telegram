@@ -2,15 +2,13 @@ from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, Con
 from telegram.ext import filters
 from telegram import Update, ChatPermissions
 from collections import defaultdict
-from flask import Flask
-from threading import Thread
 import re
 import time
 import datetime
 import sqlite3
 
 # ================= CONFIGURAÇÕES =================
-TOKEN = "7607196071:AAG8r_6qfR_fOv-htcEVnNHoMcy1tnmHeZ4"
+TOKEN = "COLOQUE SEU TOKEN AQUI"
 
 flood_limit = 5
 flood_interval = 10
@@ -37,32 +35,22 @@ def log_event(event, user=None):
     timestamp = datetime.datetime.utcnow() + datetime.timedelta(hours=-3)
     timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
-    cursor.execute("INSERT INTO logs (timestamp, user, action) VALUES (?, ?, ?)",
-                   (timestamp_str, user, event))
+    cursor.execute(
+        "INSERT INTO logs (timestamp, user, action) VALUES (?, ?, ?)",
+        (timestamp_str, user, event)
+    )
     conn.commit()
 
     print(f"[{timestamp_str}] {event}")
 
-# ================= FLASK PARA MANTER ONLINE =================
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Bot online!"
-
-def run_flask():
-    app.run(host='0.0.0.0', port=8080)
-
-Thread(target=run_flask).start()
-
-# ================= COMANDOS BÁSICOS =================
+# ================= COMANDO START =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 Bot de moderação ativo! Use /regras para ver as regras."
     )
     log_event("Comando /start usado", user=update.message.from_user.username)
 
-# ================= AJUDA INTERATIVA =================
+# ================= AJUDA =================
 async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
 🤖 *Central de Comandos do Bot*
@@ -78,12 +66,10 @@ async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔇 /mute → Silencia o usuário  
 🔊 /unmute → Remove silêncio do usuário  
 ⛔ /ban → Bane o usuário  
-🧹 /clear → Apaga mensagens das últimas 1h  
+🧹 /clear <n> → Apaga as últimas n mensagens  
 
 📌 *Informações do grupo:*
 📖 /regras → Mostra as regras do grupo  
-
-📬 *Observação:* Este bot mantém o grupo organizado automaticamente.
 """
     await update.message.reply_text(help_text, parse_mode="Markdown")
     log_event("Comando /ajuda usado", user=update.message.from_user.username)
@@ -117,14 +103,20 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Bloquear links
     if "http://" in text or "https://" in text or "t.me/" in text:
         await update.message.delete()
-        await context.bot.send_message(update.effective_chat.id, f"⛔ @{username}, links não são permitidos.")
+        await context.bot.send_message(
+            update.effective_chat.id,
+            f"⛔ @{username}, links não são permitidos."
+        )
         log_event(f"Link bloqueado: {text}", user=username)
         return
 
-    # Bloquear CAPSLOCK
+    # CAPSLOCK
     if text.isupper() and len(text) > 5:
         await update.message.delete()
-        await context.bot.send_message(update.effective_chat.id, f"⚠️ @{username}, evite usar só MAIÚSCULAS.")
+        await context.bot.send_message(
+            update.effective_chat.id,
+            f"⚠️ @{username}, evite usar só MAIÚSCULAS."
+        )
         log_event(f"Mensagem em CAPS bloqueada: {text}", user=username)
         return
 
@@ -132,18 +124,26 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for word in blocked_words:
         if re.search(rf"\b{word}\b", text, re.IGNORECASE):
             await update.message.delete()
-            await context.bot.send_message(update.effective_chat.id, f"🚫 @{username}, essa palavra não é permitida.")
+            await context.bot.send_message(
+                update.effective_chat.id,
+                f"🚫 @{username}, essa palavra não é permitida."
+            )
             log_event(f"Palavra proibida: {text}", user=username)
             return
 
     # Anti-flood
     now = time.time()
-    user_messages[user_id] = [t for t in user_messages[user_id] if now - t < flood_interval]
+    user_messages[user_id] = [
+        t for t in user_messages[user_id] if now - t < flood_interval
+    ]
     user_messages[user_id].append(now)
 
     if len(user_messages[user_id]) > flood_limit:
         await update.message.delete()
-        await context.bot.send_message(update.effective_chat.id, f"⚠️ @{username}, pare de floodar.")
+        await context.bot.send_message(
+            update.effective_chat.id,
+            f"⚠️ @{username}, pare de floodar."
+        )
         log_event("Flood detectado", user=username)
         return
 
@@ -161,6 +161,7 @@ async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TY
         log_event("Resposta automática 'ajuda' enviada", user=username)
 
 # ================= SISTEMA DE AVISOS =================
+from collections import defaultdict
 warnings = defaultdict(int)
 
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -189,7 +190,11 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.reply_to_message.from_user
     permissions = ChatPermissions(can_send_messages=False)
 
-    await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
+    await context.bot.restrict_chat_member(
+        update.effective_chat.id,
+        user.id,
+        permissions=permissions
+    )
     log_event(f"Usuário silenciado: {user.username}")
 
 # ================= COMANDO UNMUTE =================
@@ -199,9 +204,16 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user = update.message.reply_to_message.from_user
-    permissions = ChatPermissions(can_send_messages=True, can_send_media_messages=True)
+    permissions = ChatPermissions(
+        can_send_messages=True,
+        can_send_media_messages=True
+    )
 
-    await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
+    await context.bot.restrict_chat_member(
+        update.effective_chat.id,
+        user.id,
+        permissions=permissions
+    )
     log_event(f"Silêncio removido de: {user.username}")
 
 # ================= COMANDO BAN =================
@@ -216,7 +228,6 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= COMANDO CLEAR =================
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Verificar se usuário informou a quantidade
     if len(context.args) == 0 or not context.args[0].isdigit():
         await update.message.reply_text("Use: /clear <quantidade>\nEx: /clear 5")
         return
@@ -226,51 +237,39 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg_id = update.message.message_id
     apagadas = 0
 
-    for i in range(quantidade + 1):  # +1 para apagar também o comando
+    for i in range(quantidade + 1):
         try:
             await context.bot.delete_message(chat_id, msg_id - i)
             apagadas += 1
         except:
-            pass  # Ignora erros (mensagens muito antigas, sem permissão, etc.)
-
-    # Confirmação visual
-    try:
-        confirm = await update.message.reply_text(
-            f"🧹 {apagadas} mensagens apagadas!"
-        )
-        await confirm.delete()
-    except:
-        pass
+            pass
 
     log_event(
         f"{apagadas} mensagens apagadas pelo /clear",
         user=update.message.from_user.username
     )
 
-
 # ================= MAIN =================
 def main():
-    app_bot = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    # Comandos
-    app_bot.add_handler(CommandHandler("start", start))
-    app_bot.add_handler(CommandHandler("regras", regras))
-    app_bot.add_handler(CommandHandler("ajuda", ajuda))
-    app_bot.add_handler(CommandHandler("warn", warn))
-    app_bot.add_handler(CommandHandler("mute", mute))
-    app_bot.add_handler(CommandHandler("unmute", unmute))
-    app_bot.add_handler(CommandHandler("ban", ban))
-    app_bot.add_handler(CommandHandler("clear", clear))   # <<< ADICIONADO AQUI
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("regras", regras))
+    app.add_handler(CommandHandler("ajuda", ajuda))
+    app.add_handler(CommandHandler("warn", warn))
+    app.add_handler(CommandHandler("mute", mute))
+    app.add_handler(CommandHandler("unmute", unmute))
+    app.add_handler(CommandHandler("ban", ban))
+    app.add_handler(CommandHandler("clear", clear))
 
-    # Eventos
-    app_bot.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-    app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
-    app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respostas_automaticas))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respostas_automaticas))
 
-    print("✅ Bot rodando...")
-    log_event("Bot iniciado e pronto para operação")
+    print("Bot rodando...")
+    log_event("Bot iniciado com sucesso")
 
-    app_bot.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
