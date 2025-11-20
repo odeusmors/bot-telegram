@@ -36,13 +36,11 @@ conn.commit()
 def log_event(event, user=None):
     timestamp = datetime.datetime.utcnow() + datetime.timedelta(hours=-3)
     timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Grava no banco
+
     cursor.execute("INSERT INTO logs (timestamp, user, action) VALUES (?, ?, ?)",
                    (timestamp_str, user, event))
     conn.commit()
-    
-    # Print no console
+
     print(f"[{timestamp_str}] {event}")
 
 # ================= FLASK PARA MANTER ONLINE =================
@@ -80,17 +78,17 @@ async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔇 /mute → Silencia o usuário  
 🔊 /unmute → Remove silêncio do usuário  
 ⛔ /ban → Bane o usuário  
+🧹 /clear → Apaga mensagens das últimas 1h  
 
 📌 *Informações do grupo:*
 📖 /regras → Mostra as regras do grupo  
-💡 *Dica:* Respeite sempre as regras e colabore com conteúdo relevante!  
 
-📬 *Observação:* Este bot mantém o grupo organizado e seguro automaticamente.
+📬 *Observação:* Este bot mantém o grupo organizado automaticamente.
 """
     await update.message.reply_text(help_text, parse_mode="Markdown")
     log_event("Comando /ajuda usado", user=update.message.from_user.username)
 
-# ================= REGRAS FORMATADAS =================
+# ================= REGRAS =================
 async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rules_text = """
 📌 *Regras do Grupo*
@@ -100,8 +98,6 @@ async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
 3️⃣ Evite mensagens só em CAPS.  
 4️⃣ Nada de palavras ofensivas/proibidas.  
 5️⃣ Contribua com conteúdo relevante 🙌  
-
-⚡ *O bot modera automaticamente para manter o grupo seguro.*
 """
     await update.message.reply_text(rules_text, parse_mode="Markdown")
     log_event("Comando /regras usado", user=update.message.from_user.username)
@@ -125,7 +121,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_event(f"Link bloqueado: {text}", user=username)
         return
 
-    # Bloquear capslock
+    # Bloquear CAPSLOCK
     if text.isupper() and len(text) > 5:
         await update.message.delete()
         await context.bot.send_message(update.effective_chat.id, f"⚠️ @{username}, evite usar só MAIÚSCULAS.")
@@ -155,53 +151,94 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def respostas_automaticas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     username = update.message.from_user.username or update.message.from_user.first_name
+
     if "oi" in text or "olá" in text:
         await update.message.reply_text(f"Olá @{username}! 👋")
-        log_event("Resposta automática 'Olá' enviada", user=username)
+        log_event("Resposta automática 'olá' enviada", user=username)
+
     elif "ajuda" in text:
         await update.message.reply_text("Use o comando /ajuda para ver todos os comandos do bot.")
         log_event("Resposta automática 'ajuda' enviada", user=username)
 
-# ================= COMANDOS DE ADMIN =================
+# ================= SISTEMA DE AVISOS =================
 warnings = defaultdict(int)
 
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
-        await update.message.reply_text("❗ Use /warn respondendo a uma mensagem do usuário.")
+        await update.message.reply_text("❗ Use /warn respondendo à mensagem do usuário.")
         return
+
     user = update.message.reply_to_message.from_user
     warnings[user.id] += 1
-    await update.message.reply_text(f"⚠️ @{user.username or user.first_name} recebeu um aviso ({warnings[user.id]}/3).")
-    log_event(f"Comando /warn usado em {user.username or user.first_name} ({warnings[user.id]}/3)", user=update.message.from_user.username)
+
+    await update.message.reply_text(
+        f"⚠️ @{user.username or user.first_name} recebeu um aviso ({warnings[user.id]}/3)."
+    )
+    log_event(f"Aviso aplicado em {user.username}", user=update.message.from_user.username)
+
     if warnings[user.id] >= 3:
         await update.message.chat.kick_member(user.id)
-        log_event(f"{user.username or user.first_name} foi banido após 3 avisos")
+        log_event(f"Usuário banido após 3 avisos: {user.username}")
 
+# ================= COMANDO MUTE =================
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
-        await update.message.reply_text("❗ Use /mute respondendo a uma mensagem do usuário.")
+        await update.message.reply_text("❗ Use /mute respondendo a uma mensagem.")
         return
+
     user = update.message.reply_to_message.from_user
     permissions = ChatPermissions(can_send_messages=False)
-    await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
-    log_event(f"Usuário silenciado: {user.username or user.first_name}", user=update.message.from_user.username)
 
+    await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
+    log_event(f"Usuário silenciado: {user.username}")
+
+# ================= COMANDO UNMUTE =================
 async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
-        await update.message.reply_text("❗ Use /unmute respondendo a uma mensagem do usuário.")
+        await update.message.reply_text("❗ Use /unmute respondendo a uma mensagem.")
         return
+
     user = update.message.reply_to_message.from_user
     permissions = ChatPermissions(can_send_messages=True, can_send_media_messages=True)
-    await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
-    log_event(f"Silêncio removido: {user.username or user.first_name}", user=update.message.from_user.username)
 
+    await context.bot.restrict_chat_member(update.effective_chat.id, user.id, permissions=permissions)
+    log_event(f"Silêncio removido de: {user.username}")
+
+# ================= COMANDO BAN =================
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
-        await update.message.reply_text("❗ Use /ban respondendo a uma mensagem do usuário.")
+        await update.message.reply_text("❗ Use /ban respondendo a uma mensagem.")
         return
+
     user = update.message.reply_to_message.from_user
     await update.message.chat.kick_member(user.id)
-    log_event(f"Usuário banido: {user.username or user.first_name}", user=update.message.from_user.username)
+    log_event(f"Usuário banido: {user.username}")
+
+# ================= COMANDO CLEAR =================
+async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    now = time.time()
+    one_hour = 60 * 60
+    deleted = 0
+
+    try:
+        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=200):
+            msg_time = message.date.timestamp()
+
+            if now - msg_time <= one_hour:
+                try:
+                    await context.bot.delete_message(chat.id, message.message_id)
+                    deleted += 1
+                except:
+                    pass
+    except Exception as e:
+        await update.message.reply_text(f"Erro ao buscar mensagens: {e}")
+        return
+
+    await update.message.reply_text(
+        f"🧹 Foram apagadas {deleted} mensagens das últimas 1h."
+    )
+    log_event(f"{deleted} mensagens apagadas pelo /clear", user=update.message.from_user.username)
 
 # ================= MAIN =================
 def main():
@@ -215,6 +252,7 @@ def main():
     app_bot.add_handler(CommandHandler("mute", mute))
     app_bot.add_handler(CommandHandler("unmute", unmute))
     app_bot.add_handler(CommandHandler("ban", ban))
+    app_bot.add_handler(CommandHandler("clear", clear))   # <<< ADICIONADO AQUI
 
     # Eventos
     app_bot.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
@@ -224,7 +262,6 @@ def main():
     print("✅ Bot rodando...")
     log_event("Bot iniciado e pronto para operação")
 
-    # Rodar polling
     app_bot.run_polling()
 
 if __name__ == "__main__":
