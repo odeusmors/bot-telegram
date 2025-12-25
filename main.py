@@ -4,25 +4,44 @@ import time
 import datetime
 import sqlite3
 import asyncio
+import threading
 from collections import defaultdict
-from dotenv import load_dotenv 
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
+# Bibliotecas do Telegram e Segurança
+from dotenv import load_dotenv
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
 from telegram import Update, ChatPermissions
 
-# Carregar variáveis de ambiente
+# ================= CONFIGURAÇÃO DE AMBIENTE =================
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-# ================= CONFIGURAÇÕES =================
+# Configurações do Bot
 flood_limit = 5
 flood_interval = 10
 user_messages = defaultdict(list)
 blocked_words = ["hack gratuito", "senha123", "porn", "crack", "spam"]
 welcome_message = "👋 Bem-vindo(a), {user}! Respeite as regras e aproveite o grupo 🚀"
+warnings = defaultdict(int)
+
+# ================= SERVIDOR PARA O RENDER (HEALTH CHECK) =================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+    def log_message(self, format, *args):
+        return # Silencia os logs do servidor web no console
+
+def run_health_check():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"Servidor de monitoramento iniciado na porta {port}")
+    server.serve_forever()
 
 # ================= BANCO DE DADOS =================
-# Usamos caminhos absolutos para evitar erros no Render
 db_path = os.path.join(os.path.dirname(__file__), 'logs.db')
 conn = sqlite3.connect(db_path, check_same_thread=False)
 cursor = conn.cursor()
@@ -44,18 +63,17 @@ def log_event(event, user=None):
     conn.commit()
     print(f"[{timestamp_str}] {event}")
 
-# ================= COMANDOS =================
+# ================= COMANDOS DE MODERAÇÃO =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Bot de moderação ativo!")
+    await update.message.reply_text("🤖 Bot de moderação ativo! Use /ajuda para ver os comandos.")
     log_event("Comando /start usado", user=update.effective_user.username)
 
-# CORREÇÃO DO CLEAR
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Verificar se o usuário é admin antes de apagar
+    # Verificação de Admin
     member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
     if member.status not in ['administrator', 'creator']:
-        await update.message.reply_text("❌ Apenas administradores podem usar este comando.")
+        await update.message.reply_text("❌ Apenas administradores podem limpar o chat.")
         return
 
     if not context.args or not context.args[0].isdigit():
@@ -65,49 +83,74 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     quantidade = int(context.args[0])
     chat_id = update.effective_chat.id
     
-    # Apaga a mensagem do comando /clear primeiro
+    # Apaga a mensagem do comando
     await update.message.delete()
 
     apagadas = 0
     msg_id = update.message.message_id
 
-    # Tentativa de apagar mensagens anteriores (limite de 100 para evitar travamentos)
+    # Tenta apagar as mensagens anteriores
     for i in range(min(quantidade, 100)):
         try:
             await context.bot.delete_message(chat_id, msg_id - (i + 1))
             apagadas += 1
         except Exception:
-            continue # Ignora mensagens que não podem ser apagadas
+            continue
 
-    confirmacao = await context.bot.send_message(chat_id, f"🧹 {apagadas} mensagens limpas!")
-    # Auto-deleta a mensagem de confirmação após 3 segundos
+    confirmacao = await context.bot.send_message(chat_id, f"🧹 {apagadas} mensagens removidas!")
     await asyncio.sleep(3)
     await confirmacao.delete()
+    log_event(f"Clear executado: {apagadas} msgs", user=update.effective_user.username)
 
-# ... (outras funções mantidas, mas recomendo unificar MessageHandlers)
+# ================= MODERAÇÃO AUTOMÁTICA =================
 
-# ================= MAIN =================
-async def main():
-    if not TOKEN:
-        print("ERRO: Token não encontrado! Verifique o arquivo .env ou variáveis de ambiente.")
+async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text: return
+    
+    user_id = update.message.from_user.id
+    username = update.message.from_user.username or update.message.from_user.first_name
+    text = update.message.text
+
+    # Bloquear links
+    if any(link in text.lower() for link in ["http://", "https://", "t.me/"]):
+        await update.message.delete()
+        log_event(f"Link bloqueado", user=username)
         return
 
-    app = ApplicationBuilder().token(TOKEN).build()
-    await app.bot.delete_webhook(drop_pending_updates=True)
+    # Anti-flood
+    now = time.time()
+    user_messages[user_id] = [t for t in user_messages[user_id] if now - t < flood_interval]
+    user_messages[user_id].append(now)
 
-    # Handlers
+    if len(user_messages[user_id]) > flood_limit:
+        await update.message.delete()
+        log_event("Flood detectado", user=username)
+        return
+
+# ================= MAIN =================
+
+async def main():
+    if not TOKEN:
+        print("ERRO: TELEGRAM_TOKEN não configurado!")
+        return
+
+    # Inicia o servidor web para o Render não derrubar o bot
+    threading.Thread(target=run_health_check, daemon=True).start()
+
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    # Handlers de comandos
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
-    # Adicione os outros handlers aqui...
-
-    # Handler de moderação (deve ser um dos últimos para não interceptar tudo antes)
+    
+    # Handlers de mensagens (Boas-vindas e Filtros)
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
 
-    print("Bot rodando...")
-    await app.run_polling()
+    print("🚀 Bot iniciado e monitorando...")
+    await app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
