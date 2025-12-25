@@ -134,23 +134,33 @@ async def main():
         print("ERRO: TELEGRAM_TOKEN não configurado!")
         return
 
-    # Inicia o servidor web para o Render não derrubar o bot
+    # 1. Inicia o servidor web para o Render em uma thread separada
     threading.Thread(target=run_health_check, daemon=True).start()
 
+    # 2. Configura a aplicação
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Handlers de comandos
+    # Handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
-    
-    # Handlers de mensagens (Boas-vindas e Filtros)
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
 
+    # 3. Inicia o bot manualmente para evitar conflito de loops
     print("🚀 Bot iniciado e monitorando...")
-    await app.run_polling(drop_pending_updates=True)
+    
+    async with app:
+        await app.initialize()
+        await app.start()
+        # drop_pending_updates=True evita que o bot responda mensagens antigas ao ligar
+        await app.updater.start_polling(drop_pending_updates=True)
+        
+        # Mantém o bot rodando "para sempre"
+        while True:
+            await asyncio.sleep(3600)
 
 if __name__ == "__main__":
+    # O loop principal agora é controlado de forma limpa
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        pass
+        print("Bot desligado.")
