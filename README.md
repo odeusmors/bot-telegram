@@ -23,6 +23,7 @@ bot-telegram/
 ├─ requirements.txt # Dependências do projeto
 ├─ logs.db # Banco de dados SQLite (criado automaticamente)
 └─ README.md # Documentação do projeto
+└─ .gitignore # Arquivo que contém algo para ignorar outra coisa " Não vou dizer o que é "
 
 
 ---
