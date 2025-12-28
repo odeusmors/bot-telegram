@@ -1,10 +1,10 @@
 import os
-import re
 import time
 import datetime
 import sqlite3
 import asyncio
 import threading
+import signal
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -17,13 +17,13 @@ from telegram import Update, ChatPermissions
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
+# Configurações do Bot
 flood_limit = 5
 flood_interval = 10
 user_messages = defaultdict(list)
 blocked_words = ["hack gratuito", "senha123", "porn", "crack", "spam"]
-warnings = defaultdict(int)
 
-# ================= MONITORAMENTO RENDER =================
+# ================= SERVIDOR DE MONITORAMENTO (HEALTH CHECK) =================
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -34,6 +34,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 def run_health_check():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"Servidor Health Check rodando na porta {port}")
     server.serve_forever()
 
 # ================= BANCO DE DADOS =================
@@ -71,6 +72,7 @@ async def regras(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📌 *Regras:* Proibido flood, ofensas e links não autorizados.")
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Verificação de Admin
     user_status = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
     if user_status.status not in ['administrator', 'creator']:
         return await update.message.reply_text("❌ Apenas administradores podem usar este comando.")
@@ -82,10 +84,10 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     message_id = update.message.message_id
     
-    await update.message.delete() # Deleta o comando /clear
+    await update.message.delete() # Deleta o comando /clear enviado pelo user
 
     apagadas = 0
-    # Aumentamos o range de tentativas para garantir que pule IDs vazios
+    # Range estendido para garantir a limpeza em caso de IDs vazios
     for i in range(1, quantidade + 50):
         if apagadas >= quantidade: break
         try:
@@ -94,9 +96,10 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             continue
 
-    aviso = await context.bot.send_message(chat_id, f"🧹 {apagadas} mensagens removidas do histórico.")
+    aviso = await context.bot.send_message(chat_id, f"🧹 {apagadas} mensagens removidas.")
     await asyncio.sleep(3)
-    await aviso.delete()
+    try: await aviso.delete() 
+    except: pass
 
 async def fechar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_status = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
@@ -118,20 +121,30 @@ async def abrir(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     text = update.message.text.lower()
+    user = update.effective_user.username or update.effective_user.first_name
     
-    if any(link in text for link in ["http", "t.me/"]):
-        await update.message.delete()
+    # Bloqueio de Links
+    if any(link in text for link in ["http://", "https://", "t.me/"]):
+        try:
+            await update.message.delete()
+            log_event(f"Link bloqueado de {user}")
+        except: pass
         return
 
-# ================= MAIN =================
+# ================= EXECUÇÃO PRINCIPAL =================
 
 async def main():
-    if not TOKEN: return
+    if not TOKEN:
+        print("ERRO: TELEGRAM_TOKEN não encontrado nas variáveis de ambiente.")
+        return
+
+    # Inicia o Health Check para o Render
     threading.Thread(target=run_health_check, daemon=True).start()
 
+    # Inicializa a aplicação
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Comandos
+    # Registro de Comandos
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ajuda", ajuda))
     app.add_handler(CommandHandler("regras", regras))
@@ -139,15 +152,25 @@ async def main():
     app.add_handler(CommandHandler("fechar", fechar))
     app.add_handler(CommandHandler("abrir", abrir))
     
-    # Filtro de texto
+    # Filtro de Mensagens (texto)
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), check_message))
 
     async with app:
         await app.initialize()
         await app.start()
+        
+        # Delay de segurança para o Telegram reconhecer a nova conexão
+        await asyncio.sleep(2)
+        
         await app.updater.start_polling(drop_pending_updates=True)
-        print("🚀 Bot rodando com sucesso!")
-        while True: await asyncio.sleep(3600)
+        print("🚀 Bot iniciado com sucesso!")
+        
+        # Mantém o loop ativo
+        while True:
+            await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("Encerrando bot...")
